@@ -15,12 +15,17 @@ from app.schemas.prediction import (
 )
 from app.schemas.session import SessionResponse, SessionErrorResponse
 from app.services.inference import InferenceEngine
+from app.services.explain_ai import ExplainAI
 from app.utils.preprocess import validate_input_data
 from app.core.config import NUMERIC_FEATURES
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Initialize ExplainAI engine
+explain_ai = ExplainAI()
+
 
 # Global session storage (in production, use a database)
 sessions: Dict[str, Dict[str, Any]] = {}
@@ -104,13 +109,13 @@ async def get_session(session_id: str) -> SessionResponse:
 @router.post("/predict/lap-time", response_model=LapTimeResponse)
 async def predict_lap_time(request: PredictionRequest) -> LapTimeResponse:
     """
-    Predict lap time.
+    Predict lap time with explanation.
     
     Args:
         request: PredictionRequest with telemetry data
     
     Returns:
-        LapTimeResponse with prediction and confidence
+        LapTimeResponse with prediction and explanation
     """
     try:
         # Validate session
@@ -135,12 +140,29 @@ async def predict_lap_time(request: PredictionRequest) -> LapTimeResponse:
         X, metadata = inference_engine.preprocess_prediction_input(request_dict)
         lap_time, confidence = inference_engine.predict_lap_time(X)
         
+        # Generate explanation - with detailed logging
+        features_dict = {k: v for k, v in request_dict.items() 
+                        if k in NUMERIC_FEATURES}
+        
+        logger.info(f"ExplainAI available: {explain_ai.is_available()}")
+        logger.info(f"Features for explanation: {list(features_dict.keys())}")
+        logger.info(f"Prediction value: {lap_time}")
+        
+        explanation = explain_ai.explain_prediction(
+            features=features_dict,
+            prediction=lap_time,
+            task="lap_time"
+        )
+        
+        logger.info(f"Generated explanation: {explanation[:100]}...")
+        
         response = LapTimeResponse(
             session_id=request.session_id,
             vehicle_id=request.vehicle_id,
             lap=request.lap,
             predicted_lap_time=lap_time,
-            confidence=confidence
+            confidence=confidence,
+            explanation=explanation
         )
         
         # Store prediction in session
@@ -156,7 +178,7 @@ async def predict_lap_time(request: PredictionRequest) -> LapTimeResponse:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error predicting lap time: {e}")
+        logger.error(f"Error predicting lap time: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Prediction failed: {str(e)}"
@@ -166,16 +188,9 @@ async def predict_lap_time(request: PredictionRequest) -> LapTimeResponse:
 @router.post("/predict/pit", response_model=PitImminentResponse)
 async def predict_pit(request: PredictionRequest) -> PitImminentResponse:
     """
-    Predict if pit stop is imminent.
-    
-    Args:
-        request: PredictionRequest with telemetry data
-    
-    Returns:
-        PitImminentResponse with prediction and probability
+    Predict if pit stop is imminent with explanation.
     """
     try:
-        # Validate session
         if request.session_id not in sessions:
             logger.warning(f"Invalid session: {request.session_id}")
             raise HTTPException(
@@ -183,7 +198,6 @@ async def predict_pit(request: PredictionRequest) -> PitImminentResponse:
                 detail=f"Session {request.session_id} not found"
             )
         
-        # Validate input
         request_dict = request.model_dump()
         is_valid, error_msg = validate_input_data(request_dict, NUMERIC_FEATURES)
         if not is_valid:
@@ -193,19 +207,31 @@ async def predict_pit(request: PredictionRequest) -> PitImminentResponse:
                 detail=error_msg
             )
         
-        # Preprocess and predict
         X, metadata = inference_engine.preprocess_prediction_input(request_dict)
         pit_imminent, probability = inference_engine.predict_pit_imminent(X)
+        
+        features_dict = {k: v for k, v in request_dict.items() if k in NUMERIC_FEATURES}
+        
+        logger.info(f"ExplainAI available: {explain_ai.is_available()}")
+        logger.info(f"Pit prediction: {pit_imminent}")
+        
+        explanation = explain_ai.explain_prediction(
+            features=features_dict,
+            prediction=pit_imminent,
+            task="pit_detection"
+        )
+        
+        logger.info(f"Generated explanation: {explanation[:100]}...")
         
         response = PitImminentResponse(
             session_id=request.session_id,
             vehicle_id=request.vehicle_id,
             lap=request.lap,
             pit_imminent=pit_imminent,
-            probability=probability
+            probability=probability,
+            explanation=explanation
         )
         
-        # Store prediction in session
         sessions[request.session_id]['predictions'].append({
             'type': 'pit_imminent',
             'timestamp': datetime.utcnow(),
@@ -218,7 +244,7 @@ async def predict_pit(request: PredictionRequest) -> PitImminentResponse:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error predicting pit: {e}")
+        logger.error(f"Error predicting pit: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Prediction failed: {str(e)}"
@@ -228,16 +254,9 @@ async def predict_pit(request: PredictionRequest) -> PitImminentResponse:
 @router.post("/predict/tire", response_model=TireCompoundResponse)
 async def predict_tire(request: PredictionRequest) -> TireCompoundResponse:
     """
-    Predict suggested tire compound.
-    
-    Args:
-        request: PredictionRequest with telemetry data
-    
-    Returns:
-        TireCompoundResponse with suggestion and confidence
+    Predict suggested tire compound with explanation.
     """
     try:
-        # Validate session
         if request.session_id not in sessions:
             logger.warning(f"Invalid session: {request.session_id}")
             raise HTTPException(
@@ -245,7 +264,6 @@ async def predict_tire(request: PredictionRequest) -> TireCompoundResponse:
                 detail=f"Session {request.session_id} not found"
             )
         
-        # Validate input
         request_dict = request.model_dump()
         is_valid, error_msg = validate_input_data(request_dict, NUMERIC_FEATURES)
         if not is_valid:
@@ -255,19 +273,31 @@ async def predict_tire(request: PredictionRequest) -> TireCompoundResponse:
                 detail=error_msg
             )
         
-        # Preprocess and predict
         X, metadata = inference_engine.preprocess_prediction_input(request_dict)
         tire_compound, confidence = inference_engine.predict_tire_compound(X)
+        
+        features_dict = {k: v for k, v in request_dict.items() if k in NUMERIC_FEATURES}
+        
+        logger.info(f"ExplainAI available: {explain_ai.is_available()}")
+        logger.info(f"Tire prediction: {tire_compound}")
+        
+        explanation = explain_ai.explain_prediction(
+            features=features_dict,
+            prediction=tire_compound,
+            task="tire_suggestion"
+        )
+        
+        logger.info(f"Generated explanation: {explanation[:100]}...")
         
         response = TireCompoundResponse(
             session_id=request.session_id,
             vehicle_id=request.vehicle_id,
             lap=request.lap,
             suggested_compound=tire_compound,
-            confidence=confidence
+            confidence=confidence,
+            explanation=explanation
         )
         
-        # Store prediction in session
         sessions[request.session_id]['predictions'].append({
             'type': 'tire_compound',
             'timestamp': datetime.utcnow(),
@@ -280,7 +310,7 @@ async def predict_tire(request: PredictionRequest) -> TireCompoundResponse:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error predicting tire: {e}")
+        logger.error(f"Error predicting tire: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Prediction failed: {str(e)}"
@@ -413,3 +443,5 @@ async def close_session(session_id: str) -> SessionResponse:
         created_at=session['created_at'],
         status='closed'
     )
+
+

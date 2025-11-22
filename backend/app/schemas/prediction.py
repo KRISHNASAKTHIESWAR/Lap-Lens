@@ -40,6 +40,7 @@ class LapTimeResponse(BaseModel):
     lap: int = Field(..., description="Lap number")
     predicted_lap_time: float = Field(..., description="Predicted lap time in seconds")
     confidence: float = Field(..., description="Model confidence (0-1)")
+    explanation: Optional[str] = Field(None, description="AI-generated explanation of the prediction")
 
     class Config:
         schema_extra = {
@@ -48,7 +49,8 @@ class LapTimeResponse(BaseModel):
                 "vehicle_id": 1,
                 "lap": 25,
                 "predicted_lap_time": 83.456,
-                "confidence": 0.92
+                "confidence": 0.92,
+                "explanation": "The predicted lap time of 83.456s is primarily driven by..."
             }
         }
 
@@ -60,6 +62,7 @@ class PitImminentResponse(BaseModel):
     lap: int = Field(..., description="Lap number")
     pit_imminent: bool = Field(..., description="Whether pit stop is imminent")
     probability: float = Field(..., description="Probability of pit (0-1)")
+    explanation: Optional[str] = Field(None, description="AI-generated explanation of the prediction")
 
     class Config:
         schema_extra = {
@@ -68,7 +71,8 @@ class PitImminentResponse(BaseModel):
                 "vehicle_id": 1,
                 "lap": 25,
                 "pit_imminent": True,
-                "probability": 0.78
+                "probability": 0.78,
+                "explanation": "The model predicts pit is imminent because..."
             }
         }
 
@@ -80,6 +84,7 @@ class TireCompoundResponse(BaseModel):
     lap: int = Field(..., description="Lap number")
     suggested_compound: str = Field(..., description="Suggested tire compound (SOFT, MEDIUM, HARD)")
     confidence: float = Field(..., description="Confidence score (0-1)")
+    explanation: Optional[str] = Field(None, description="AI-generated explanation of the suggestion")
 
     class Config:
         schema_extra = {
@@ -88,7 +93,8 @@ class TireCompoundResponse(BaseModel):
                 "vehicle_id": 1,
                 "lap": 25,
                 "suggested_compound": "MEDIUM",
-                "confidence": 0.85
+                "confidence": 0.85,
+                "explanation": "The model recommends MEDIUM compound because..."
             }
         }
 
@@ -119,3 +125,4 @@ class AllPredictionsResponse(BaseModel):
                 "tire_confidence": 0.85
             }
         }
+

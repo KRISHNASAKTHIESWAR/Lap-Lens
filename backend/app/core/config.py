@@ -58,3 +58,8 @@ NUMERIC_FEATURES = [
 # Logging
 LOGGING_LEVEL = os.getenv("LOGGING_LEVEL", "INFO")
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Gemini API Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.0-flash"
+

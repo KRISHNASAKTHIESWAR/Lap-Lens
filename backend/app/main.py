@@ -7,6 +7,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from dotenv import load_dotenv
+load_dotenv()
+
+
 from app.core.config import API_TITLE, API_VERSION, API_DESCRIPTION, LOGGING_LEVEL
 from app.api import routes
 

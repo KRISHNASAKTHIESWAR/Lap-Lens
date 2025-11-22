@@ -1,7 +1,9 @@
 """
-Predictor models
+Predictor models for F1 telemetry predictions
 """
 import logging
+import pickle
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
