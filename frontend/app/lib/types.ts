@@ -39,6 +39,7 @@ export interface LapTimeResponse {
   lap: number;
   predicted_lap_time: number;
   confidence: number;
+  explanation: string;
 }
 
 export interface PitImminentResponse {
@@ -47,6 +48,7 @@ export interface PitImminentResponse {
   lap: number;
   pit_imminent: boolean;
   probability: number;
+  explanation: string;
 }
 
 export interface TireCompoundResponse {
@@ -55,6 +57,7 @@ export interface TireCompoundResponse {
   lap: number;
   suggested_compound: string;
   confidence: number;
+  explanation: string;
 }
 
 // lib/types.ts
@@ -68,4 +71,12 @@ export interface AllPredictionsResponse {
   pit_probability: number;
   tire_compound: string;
   tire_confidence: number;
+    explanations?: {
+    lap_time?: string;
+    pit?: string;  
+    tire?: string;
+  };
+  lap_time_explanation?: string;
+  pit_explanation?: string;
+  tire_explanation?: string;
 }

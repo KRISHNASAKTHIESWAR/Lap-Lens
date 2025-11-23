@@ -7,15 +7,20 @@ import { useState } from 'react';
 interface SessionInfoProps {
   session: Session;
   predictions: AllPredictionsResponse | null;
+  onSessionClosed?: () => void;
 }
 
-export default function SessionInfo({ session, predictions }: SessionInfoProps) {
+export default function SessionInfo({ session, predictions,onSessionClosed }: SessionInfoProps) {
   const [isClosing, setIsClosing] = useState(false);
 
   const handleCloseSession = async () => {
     setIsClosing(true);
     try {
       await api.closeSession(session.session_id);
+      // Call the parent callback when session is closed
+      if (onSessionClosed) {
+        onSessionClosed();
+      }
     } catch (error) {
       console.error('Error closing session:', error);
     } finally {
