@@ -21,7 +21,7 @@ export default function VehicleSelection() {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/session/create?vehicle_id=${vehicleId}&race_name=${encodeURIComponent(raceName)}`,{
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session/create?vehicle_id=${vehicleId}&race_name=${encodeURIComponent(raceName)}`,{
             method: 'POST',
         }
       );

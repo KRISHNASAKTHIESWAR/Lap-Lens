@@ -87,17 +87,17 @@ export default function AnalysisPage() {
       };
 
       const [lapTimeRes, pitRes, tireRes] = await Promise.all([
-        fetch('http://localhost:8000/api/predict/lap-time', {
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/predict/lap-time`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(baseData)
         }),
-        fetch('http://localhost:8000/api/predict/pit', {
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/predict/pit`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(baseData)
         }),
-        fetch('http://localhost:8000/api/predict/tire', {
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/predict/tire`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(baseData)
