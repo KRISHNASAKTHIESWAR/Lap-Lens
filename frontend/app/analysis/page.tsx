@@ -10,6 +10,7 @@ import PredictionMetrics from '../components/dashboard/PredictionMetrics';
 import SessionInfo from '../components/dashboard/SessionInfo';
 import LiveMetrics from '../components/dashboard/LiveMetrics';
 import TrackMap from '../components/dashboard/TrackMap';
+import StoryGenerator from '../components/dashboard/StoryGenerator';
 
 export interface AllPredictionsResponse {
   session_id: string;
@@ -21,6 +22,9 @@ export interface AllPredictionsResponse {
   pit_probability: number;
   tire_compound: string;
   tire_confidence: number;
+   lap_time_explanation?: string;
+  pit_explanation?: string;
+  tire_explanation?: string;
 }
 
 const safeNumber = (value: any, fallback: number = 0): number => {
@@ -39,6 +43,7 @@ export default function AnalysisPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('overview');
+  const [showStoryGenerator, setShowStoryGenerator] = useState(false);
 
   useEffect(() => {
     if (sessionId && vehicleId) {
@@ -114,7 +119,10 @@ export default function AnalysisPage() {
         pit_imminent: pitData.pit_imminent || false,
         pit_probability: safeNumber(pitData.probability, 0.5),
         tire_compound: tireData.suggested_compound || 'MEDIUM',
-        tire_confidence: safeNumber(tireData.confidence, 0.75)
+        tire_confidence: safeNumber(tireData.confidence, 0.75),
+        lap_time_explanation: lapTimeData.explanation,
+        pit_explanation: pitData.explanation,
+        tire_explanation: tireData.explanation
       };
 
       setPredictions(allPredictions);
@@ -131,7 +139,11 @@ export default function AnalysisPage() {
         pit_imminent: false,
         pit_probability: 0.23,
         tire_compound: 'SOFT',
-        tire_confidence: 0.91
+        tire_confidence: 0.91,
+        lap_time_explanation: "Demo: AI analysis of lap time prediction based on simulated telemetry data.",
+        pit_explanation: "Demo: AI analysis of pit stop probability based on simulated tire wear and performance metrics.",
+        tire_explanation: "Demo: AI analysis of optimal tire compound based on simulated track conditions."
+
       });
     } finally {
       setIsLoading(false);
@@ -190,7 +202,7 @@ export default function AnalysisPage() {
               />
 
               <h2 className="text-3xl text-white font-bold mt-6 tracking-wider">INITIALIZING SYSTEMS</h2>
-              <p className="text-gray-300 mt-2">Vehicle #{vehicleId} • Road to Suzuka — Toyota Gazoo Racing</p>
+              <p className="text-gray-300 mt-2">Vehicle #{vehicleId} • Toyota Gazoo Racing</p>
 
               <div className="mt-6 flex space-x-1 justify-center">
                 {[...Array(6)].map((_, i) => (
@@ -205,44 +217,82 @@ export default function AnalysisPage() {
             <>
               {/* Overview View */}
               {activeView === 'overview' && predictions && (
-                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2">
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                  
+                  {/* Left Column - Main Content */}
+                  <div className="xl:col-span-3 space-y-6">
+                    {/* Prediction Metrics - Top Card */}
                     <div className="rounded-2xl p-1 bg-gradient-to-r from-white/5 via-red-700/40 to-white/5 shadow-lg">
                       <div className="bg-black/60 rounded-2xl p-6">
                         <PredictionMetrics predictions={predictions} />
                       </div>
                     </div>
+
+                    {/* Story Generator - Right below predictions */}
+                    {showStoryGenerator && (
+                      <StoryGenerator
+                        sessionId={sessionId!}
+                        vehicleId={parseInt(vehicleId!)}
+                      />
+                    )}
+
+                    {/* Bottom Row Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Live Status Card */}
+                      <div className="rounded-xl bg-black/50 p-5 border border-white/5">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-sm text-gray-300 font-orbitron tracking-wider">LIVE STATUS</h3>
+                            <div className="flex items-center space-x-3 mt-2">
+                              <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                              <span className="text-sm text-gray-300">Telemetry Active</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-gray-400 font-orbitron">VEHICLE</div>
+                            <div className="text-xl font-bold text-red-500">#{vehicleId}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* System Status Card */}
+                      <div className="rounded-xl bg-black/50 p-5 border border-white/5">
+                        <h3 className="text-sm text-gray-300 font-orbitron tracking-wider mb-4">SYSTEM STATUS</h3>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-sm">AI Predictions</span>
+                            <span className="text-green-400 text-sm">● ONLINE</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-sm">Telemetry Feed</span>
+                            <span className="text-green-400 text-sm">● ACTIVE</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-sm">Session</span>
+                            <span className={showStoryGenerator ? "text-red-400 text-sm" : "text-green-400 text-sm"}>
+                              ● {showStoryGenerator ? "CLOSED" : "ACTIVE"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-6">
-                    <div className="rounded-xl p-1 bg-gradient-to-tr from-red-700 to-transparent">
-                      <div className="bg-black/60 rounded-lg p-5">
+                  {/* Right Column - Session Info Only */}
+                  <div className="xl:col-span-1">
+                    <div className="rounded-xl p-1 bg-gradient-to-tr from-red-700 to-transparent shadow-lg">
+                      <div className="bg-black/60 rounded-xl p-5">
                         <SessionInfo
                           session={{
                             session_id: sessionId,
                             vehicle_id: parseInt(vehicleId),
                             race_name: "Race 1",
                             created_at: new Date().toISOString(),
-                            status: 'active'
+                            status: showStoryGenerator ? 'closed' : 'active'
                           }}
                           predictions={predictions}
+                          onSessionClosed={() => setShowStoryGenerator(true)}
                         />
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl bg-black/50 p-5 border border-white/5">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-sm text-gray-300">LIVE STATUS</h3>
-                          <div className="flex items-center space-x-3 mt-2">
-                            <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                            <span className="text-sm text-gray-300">Telemetry • Predictions • Strategy</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xs text-gray-400">VEHICLE</div>
-                          <div className="text-lg font-bold">#{vehicleId}</div>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -287,9 +337,10 @@ export default function AnalysisPage() {
                           vehicle_id: parseInt(vehicleId),
                           race_name: "Race 1",
                           created_at: new Date().toISOString(),
-                          status: 'active'
+                          status: showStoryGenerator ? 'closed' : 'active'
                         }}
                         predictions={predictions}
+                        onSessionClosed={() => setShowStoryGenerator(true)}
                       />
                     </div>
                   </div>
