@@ -24,7 +24,7 @@ export default function StoryGenerator({ sessionId, vehicleId }: StoryGeneratorP
     setError("");
 
     try {
-      const response = await fetch("http://localhost:8000/api/race/generate-race-story-auto", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/race/generate-race-story-auto`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
