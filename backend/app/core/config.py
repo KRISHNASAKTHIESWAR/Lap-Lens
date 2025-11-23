@@ -16,7 +16,23 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 # ------------------------------
 # Models directory (explicit)
 # ------------------------------
-MODELS_DIR = PROJECT_ROOT / "backend" / "data" / "models"
+# Model directory (auto-detects correct path on both local + Render)
+possible_model_dirs = [
+    PROJECT_ROOT / "backend" / "data" / "models",  # your current setup
+    PROJECT_ROOT / "data" / "models",              # fallback for Render
+]
+
+# pick the first existing directory
+for d in possible_model_dirs:
+    if d.exists():
+        MODELS_DIR = d
+        break
+else:
+    # if none exist, default to PROJECT_ROOT/data/models
+    MODELS_DIR = PROJECT_ROOT / "data" / "models"
+
+print("Using MODELS_DIR:", MODELS_DIR)
+
 
 # Model file paths
 LAP_TIME_MODEL_PATH = MODELS_DIR / "lap_time_model.pkl"

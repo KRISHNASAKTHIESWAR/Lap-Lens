@@ -75,5 +75,9 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
+    import os
+    from app.core.config import MODELS_DIR
+    print("FILES IN MODELS DIR:", os.listdir(MODELS_DIR))
+
     logger.info("Starting F1 Telemetry Prediction API...")
     uvicorn.run(app, host="0.0.0.0", port=8000)

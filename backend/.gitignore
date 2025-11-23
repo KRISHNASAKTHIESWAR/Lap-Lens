@@ -38,8 +38,8 @@ env/
 .DS_Store
 
 # Data and models (except data directory structure)
-data/models/*.pkl
-data/models/*.pickle
+# data/models/*.pkl
+# data/models/*.pickle
 
 # Logs
 *.log
