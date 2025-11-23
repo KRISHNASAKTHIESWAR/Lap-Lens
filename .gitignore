@@ -18,6 +18,10 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-backend/data
+backend/data/raw/
+backend/data/processed/
+
 backend/venv/
+
+
 

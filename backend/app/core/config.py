@@ -11,7 +11,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw" / "Race1"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
-MODELS_DIR = DATA_DIR / "models"
+MODELS_DIR = PROJECT_ROOT / "backend" / "data" / "models"
 
 # Model file paths
 LAP_TIME_MODEL_PATH = MODELS_DIR / "lap_time_model.pkl"
