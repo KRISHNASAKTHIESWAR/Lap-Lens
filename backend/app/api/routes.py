@@ -11,13 +11,15 @@ from fastapi.responses import JSONResponse
 
 from app.schemas.prediction import (
     PredictionRequest, LapTimeResponse, PitImminentResponse,
-    TireCompoundResponse, AllPredictionsResponse
+    TireCompoundResponse, AllPredictionsResponse, RaceStoryRequest, RaceStoryResponse, RaceStoryRequestAuto
 )
 from app.schemas.session import SessionResponse, SessionErrorResponse
 from app.services.inference import InferenceEngine
 from app.services.explain_ai import ExplainAI
+from app.services.race_story import RaceStoryGenerator
 from app.utils.preprocess import validate_input_data
 from app.core.config import NUMERIC_FEATURES
+from app.utils.race_event_extractor import extract_race_events, calculate_summary_stats
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,9 @@ router = APIRouter()
 
 # Initialize ExplainAI engine
 explain_ai = ExplainAI()
+
+# Initialize RaceStoryGenerator engine
+race_story_generator = RaceStoryGenerator()
 
 
 # Global session storage (in production, use a database)
@@ -443,5 +448,106 @@ async def close_session(session_id: str) -> SessionResponse:
         created_at=session['created_at'],
         status='closed'
     )
+
+@router.post("/race/generate-race-story-auto")
+async def generate_race_story_auto(request: RaceStoryRequestAuto):
+
+    # 1. Get stored predictions
+    if request.session_id not in sessions:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Session {request.session_id} not found"
+        )
+
+    session_predictions = sessions[request.session_id]["predictions"]
+
+    # 2. Extract race events
+    race_events = extract_race_events(session_predictions)
+
+    # 3. Generate summary statistics
+    summary_stats = calculate_summary_stats(
+        session_data={"session_id": request.session_id},
+        session_predictions=session_predictions
+    )
+
+    # 4. Ask Gemini to create the story
+    story = race_story_generator.generate_story(
+        session_id=request.session_id,
+        vehicle_id=request.vehicle_id,
+        race_events=race_events,
+        summary_stats=summary_stats
+    )
+
+    return {
+        "session_id": request.session_id,
+        "vehicle_id": request.vehicle_id,
+        "story": story
+    }
+
+@router.post("/race/story", response_model=RaceStoryResponse)
+async def generate_race_story(request: RaceStoryRequest) -> RaceStoryResponse:
+    """
+    Generate a post-race narrative story for a specific vehicle.
+    
+    Args:
+        request: RaceStoryRequest with session info, race events, and summary statistics
+    
+    Returns:
+        RaceStoryResponse with the AI-generated race story
+    """
+    try:
+        # Validate session exists
+        if request.session_id not in sessions:
+            logger.warning(f"Invalid session: {request.session_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session {request.session_id} not found"
+            )
+        
+        # Log request details
+        logger.info(f"Generating race story for session {request.session_id}, vehicle {request.vehicle_id}")
+        logger.info(f"Race events: {len(request.race_events)} events")
+        logger.info(f"RaceStoryGenerator available: {race_story_generator.is_available()}")
+        
+        # Convert race_events to proper format
+        race_events = [event.model_dump() if hasattr(event, 'model_dump') else event 
+                      for event in request.race_events]
+        
+        # Generate the story
+        story = race_story_generator.generate_story(
+            session_id=request.session_id,
+            vehicle_id=request.vehicle_id,
+            race_events=race_events,
+            summary_stats=request.summary_stats
+        )
+        
+        logger.info(f"Successfully generated story. Length: {len(story)} characters")
+        logger.debug(f"Story preview: {story[:150]}...")
+        
+        response = RaceStoryResponse(
+            session_id=request.session_id,
+            vehicle_id=request.vehicle_id,
+            story=story
+        )
+        
+        # Store story in session
+        sessions[request.session_id]['race_story'] = {
+            'vehicle_id': request.vehicle_id,
+            'story': story,
+            'generated_at': datetime.utcnow(),
+            'race_events_count': len(race_events)
+        }
+        
+        logger.info(f"Race story stored in session {request.session_id}")
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating race story: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Race story generation failed: {str(e)}"
+        )
 
 

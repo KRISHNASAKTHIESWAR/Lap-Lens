@@ -126,3 +126,72 @@ class AllPredictionsResponse(BaseModel):
             }
         }
 
+
+class RaceEvent(BaseModel):
+    """Single race event (lap-based incident or note)"""
+    lap: int = Field(..., description="Lap number when event occurred")
+    event: str = Field(..., description="Description of the event")
+
+
+class RaceStoryRequest(BaseModel):
+    """Request for generating a race story"""
+    session_id: str = Field(..., description="Unique session identifier")
+    vehicle_id: int = Field(..., description="Vehicle identifier")
+    race_events: list[RaceEvent] = Field(..., description="List of race events by lap")
+    summary_stats: dict = Field(..., description="Race summary statistics")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "session_id": "race_abc123",
+                "vehicle_id": 1,
+                "race_events": [
+                    {"lap": 1, "event": "Strong start, gained 2 positions"},
+                    {"lap": 12, "event": "Tire degradation noticed, lap time dropped"},
+                    {"lap": 23, "event": "Pit stop, switched to mediums"}
+                ],
+                "summary_stats": {
+                    "total_laps": 58,
+                    "best_lap": 82.456,
+                    "avg_lap_time": 85.234,
+                    "pit_stops": 2,
+                    "max_speed": 310.5,
+                    "final_position": 3,
+                    "weather_summary": "Clear skies, 25°C track temp",
+                    "tire_strategy": "Soft-Medium-Medium"
+                }
+            }
+        }
+
+
+class RaceStoryResponse(BaseModel):
+    """Response containing the generated race story"""
+    session_id: str = Field(..., description="Session ID")
+    vehicle_id: int = Field(..., description="Vehicle ID")
+    story: str = Field(..., description="AI-generated race story")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "session_id": "race_abc123",
+                "vehicle_id": 1,
+                "story": "Car #1 delivered a masterclass in racecraft today..."
+            }
+        }
+
+class RaceStoryRequestAuto(BaseModel):
+    """
+    Auto-generation request schema for race story.
+    The backend will automatically fetch predictions,
+    extract events, compute summary stats, and then generate story.
+    """
+    session_id: str = Field(..., description="Unique session identifier")
+    vehicle_id: int = Field(..., description="Vehicle identifier")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "session_id": "race_ab12cd34ef56",
+                "vehicle_id": 1
+            }
+        }
