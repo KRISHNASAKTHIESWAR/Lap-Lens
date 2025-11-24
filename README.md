@@ -1,275 +1,586 @@
-﻿# LapLens – Real-Time Motorsports Telemetry & Strategy System (Built for Toyota GR Cup)
+﻿# 🏎️ LapLens Telemetry Prediction API
+A complete backend system for predicting telemetry, managing race sessions, and generating race summaries. This backend covers data preparation, model training, session tracking, prediction endpoints, and AI-driven race story generation.
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
-![FastAPI](https://img.shields.io/badge/FastAPI-API-green?logo=fastapi)
-![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-Used-blue?logo=typescript)
-![Docker](https://img.shields.io/badge/Docker-Supported-blue?logo=docker)
+## 🚀 Getting Started (5 Minutes)
+
+### Windows (Fastest Setup)
+
+Double‑click:
+
+- `quickstart.bat`
+
+This script:
+
+- Creates a virtual environment
+- Installs dependencies
+- Prepares data
+- Trains models
+- Starts the API server
+
+Open in browser:
+
+- http://localhost:8000/docs
 
 
-LapLens is an end-to-end AI-powered race-strategy system that uses Toyota GR Cup telemetry to predict lap time, pit windows, and tyre strategy, visualized through a live racing dashboard.
+### Mac / Linux
 
-This README gives you the end-to-end view: architecture, setup, how to run everything locally, and where to go for deeper docs.
+**Option A – Auto Setup**
 
----
+```bash
+python quickstart.py
+```
 
-## Tech Stack
+**Option B – Manual Setup**
 
-**Backend**
-- Language: Python 3.10+
-- Framework: FastAPI
-- Data / ML: pandas, numpy, scikit-learn (RandomForest models)
-- Validation / Config: Pydantic, python-dotenv
-- Server: Uvicorn (Gunicorn + Uvicorn workers for production)
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate      # Windows: venv\Scripts\activate
 
-**Frontend**
-- Framework: Next.js 14 (App Router)
-- Language: TypeScript, React 18
-- Styling: Tailwind CSS
-
-**Tooling & Ops**
-- Package / Env: `pip`, virtualenv
-- JavaScript tooling: npm, ESLint
-- Testing: pytest (backend), ESLint (frontend)
-- Containerisation: Docker, docker-compose
-- CI-ready: standard Python/Node workflows (pytest, lint, build)
-
----
-
-## 0. Project Story / Inspiration
-
-LapLens was built to help race engineers move beyond static spreadsheets and gut-feel when making high‑pressure strategy calls. Modern race cars stream massive amounts of telemetry, but turning that raw data into clear “pit now or stay out” decisions is still hard, especially when tyres, weather, and traffic evolve lap by lap.
-
-This project explores how an AI‑assisted workflow could look in practice: a backend that learns from rich telemetry to predict lap time, pit risk, and tyre choice, and a frontend that turns those signals into an intuitive race‑strategy console. The goal isn’t just better predictions, but faster, more explainable decisions that drivers and engineers can trust in real time.
-
----
-
-## 1. Repository Overview
-
-- `backend/` – F1 Telemetry Prediction API (FastAPI, ML models, training pipeline).
-- `frontend/` – LapLens race-strategy UI (Next.js 14, TypeScript, Tailwind CSS).
-- `data/` – Model artifacts and telemetry data (created/populated by the backend).
-
-For backend-only details, see:
-- `backend/README.md`
-- `backend/GETTING_STARTED.md`
-- `backend/START_HERE.md`
-- `backend/API_TESTING_GUIDE.md`
-- `backend/IMPLEMENTATION_SUMMARY.md`
-
-For frontend-only details, see:
-- `frontend/README.md`
-
----
-
-## 1.5. Key Features
-
-- 🧠 **ML‑Driven Telemetry Insights** – Random Forest models for lap time, pit‑imminent detection, and tyre compound suggestion using 23+ engineered features.
-- 🏁 **Session‑Aware Race Management** – Create, track, and close race sessions with full prediction history per car and event.
-- 📊 **Strategy Dashboard** – Frontend views for engineers to monitor pace, tyre behaviour, and prediction outputs across sessions.
-- 🔄 **End‑to‑End Pipeline** – From raw CSV telemetry to preprocessing, training, and live inference through a single FastAPI service.
-- 🧪 **Reproducible Experiments** – Scripts for data preparation, model training, and API testing so you can rerun or extend experiments easily.
-- 🐳 **Deployable Stack** – Dockerized backend, CI‑friendly test setup, and a Next.js frontend ready for cloud deployment with configurable API base URL.
-
----
-
-## 2. Architecture (High Level)
-
-**Backend – F1 Telemetry Prediction API**
-
-- FastAPI app in `backend/app/main.py`.
-- REST endpoints under `/api` for:
-  - Session management:
-    - `POST /api/session/create`
-    - `GET /api/session/{id}`
-    - `GET /api/session/{id}/predictions`
-    - `POST /api/session/{id}/close`
-  - Telemetry-based predictions:
-    - `POST /api/predict/lap-time`
-    - `POST /api/predict/pit`
-    - `POST /api/predict/tire`
-    - `POST /api/predict/all`
-- ML stack:
-  - 3 Random Forest models (lap time, pit imminent, tire compound).
-  - 23 engineered telemetry + weather features.
-  - Training scripts: `backend/train.py`, `backend/app/services/train_model.py`.
-  - Data prep: `backend/prepare_data.py`, `backend/app/services/data_loader.py`, `backend/app/utils/preprocess.py`.
-
-**Frontend – LapLens UI**
-
-- Next.js 14 App Router, TypeScript, Tailwind CSS.
-- Key paths:
-  - `frontend/app/page.tsx` – landing.
-  - `frontend/app/dashboard/page.tsx` – strategy dashboard.
-  - `frontend/app/analysis/page.tsx` – analysis view.
-  - `frontend/app/vehicles/page.tsx` – vehicle/session related view.
-- Shared components in `frontend/app/components/**` (dashboard panels, header, UI cards/buttons).
-- API utils and hooks:
-  - `frontend/app/lib/api.ts`
-  - `frontend/app/hooks/useSession.ts`
-  - `frontend/app/hooks/usePredictions.ts`
-- Calls the backend via `NEXT_PUBLIC_API_BASE` (default `http://localhost:8000`).
-
----
-
-## 3. Quick Start – Run Backend & Frontend Locally
-
-### 3.1 Backend (API)
-
-From the repo root:
-
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+# Install dependencies
 pip install -r requirements.txt
 
-# (Recommended) Prepare data and train models
+# Prepare data (optional)
 python prepare_data.py
+
+# Train models
 python train.py
 
-# Start FastAPI server
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Start server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Once running:
+Open API docs:
 
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-- Health: `http://localhost:8000/health` (or `/`)
+- http://localhost:8000/docs
 
-You can also use the shortcuts documented in `backend/GETTING_STARTED.md` and `backend/START_HERE.md`:
 
-- Windows: double-click `backend/quickstart.bat`
-- Cross-platform: `python quickstart.py` from `backend/`
+## 📦 Project Structure (Backend Only)
 
-### 3.2 Frontend (Next.js app)
-
-In a new terminal from the repo root:
-
-```powershell
-cd frontend
-npm install
-npm run dev
+```text
+app/
+├── api/routes.py          # All API endpoints
+├── core/config.py         # Settings & environment variables
+├── models/                # ML model wrappers
+├── schemas/               # Pydantic schemas
+├── services/              # Prediction + story generation services
+├── utils/                 # Logger, helpers
+data/
+├── raw/                   # Raw CSV telemetry
+├── processed/             # Cleaned data
+├── models/                # Trained ML models
 ```
 
-Then open:
 
-- `http://localhost:3000`
+## 📊 Data Preparation
 
-By default the frontend expects the backend at `http://localhost:8000`. To point it elsewhere, create `frontend/.env.local`:
+Place telemetry files inside:
 
-```env
-NEXT_PUBLIC_API_BASE=http://your-backend-host:8000
+```text
+data/raw/Race1/
 ```
 
----
+Required files:
 
-## 4. Typical End-to-End Usage Flow
+- `df_master_features_with_weather.csv` (required)
+- `raw_telemetry.csv` (optional)
+- `pivot.csv` (optional)
 
-1. **Start the backend** (`uvicorn` or `quickstart` as above).
-2. **Train models at least once** (if `data/models/` is empty):
-   - `python prepare_data.py`
-   - `python train.py`
-3. **Start the frontend** (`npm run dev` in `frontend/`).
-4. **Create a telemetry session** (from a client, shell, or script):
+Or generate synthetic data:
 
-   ```bash
-   curl -X POST "http://localhost:8000/api/session/create?vehicle_id=1&race_name=Race%201"
-   ```
-
-   The response contains a `session_id`.
-
-5. **Send telemetry + request predictions** using the backend API, for example:
-
-   ```bash
-   curl -X POST "http://localhost:8000/api/predict/all" ^
-     -H "Content-Type: application/json" ^
-     -d "{ \"session_id\": \"YOUR_SESSION_ID\", ... }"
-   ```
-
-   See GETTING_STARTED.md and README.md for full JSON examples.
-
-6. **View data in the UI** – open `http://localhost:3000` and navigate to dashboard/analysis pages; they use the backend endpoints (via `NEXT_PUBLIC_API_BASE`) to load sessions and predictions.
-
-For more end-to-end request examples, check:
-
-- example_client.py
-- API_TESTING_GUIDE.md
-
----
-
-## 5. Testing & Quality
-
-### Backend
-
-```powershell
-cd backend
-pip install -r requirements-dev.txt
-pytest tests/ -v
+```bash
+python prepare_data.py
 ```
 
-Optional tools (see GETTING_STARTED.md):
 
-```powershell
+## 🧠 Model Training
+
+Train all LapLens ML models:
+
+```bash
+python train.py
+```
+
+This trains:
+
+- Lap time regression model
+- Pit stop prediction model
+- Tire compound classifier
+- Scaler for feature normalization
+
+Example metrics:
+
+- Lap Time Model → R² ≈ 0.82
+- Pit Model → Accuracy ≈ 0.89
+- Tire Model → Accuracy ≈ 0.78
+
+
+## 🖥️ Start API Server
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Server URL:
+
+- http://localhost:8000
+
+
+## 🧪 Testing the API
+
+**Method 1 – Swagger UI**
+
+- Open http://localhost:8000/docs
+
+**Method 2 – Example Client**
+
+```bash
+python example_client.py
+```
+
+Demonstrates:
+
+- Creating a session
+- Making predictions
+- Fetching prediction history
+- Closing a session
+
+**Method 3 – cURL**
+
+Create session:
+
+```bash
+curl -X POST "http://localhost:8000/api/session/create?vehicle_id=1&race_name=Test"
+```
+
+Predict:
+
+```bash
+curl -X POST "http://localhost:8000/api/predict/all" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+**Method 4 – Python Requests**
+
+```python
+import requests
+
+session = requests.post(
+    "http://localhost:8000/api/session/create",
+    params={"vehicle_id": 1, "race_name": "Demo Race"}
+).json()
+
+payload = { ... }
+
+pred = requests.post(
+    "http://localhost:8000/api/predict/all",
+    json=payload
+).json()
+```
+
+
+## ⚙️ API Endpoints
+
+| Method | Endpoint | Description |
+| :-- | :-- | :-- |
+| POST | /api/session/create | Create a race session |
+| GET | /api/session/{id} | Get session information |
+| POST | /api/session/{id}/close | Close a session |
+| GET | /api/session/{id}/predictions | Fetch prediction history for a session |
+| POST | /api/predict/lap-time | Predict lap time |
+| POST | /api/predict/pit | Predict pit stop imminence |
+| POST | /api/predict/tire | Predict tire compound |
+| POST | /api/predict/all | Run all predictions at once |
+| POST | /api/race/story | Generate race story from provided events/stats |
+| POST | /api/race/story/auto | Auto-generate race story from session data |
+| POST | /generate-story-auto | Auto-generate full narrative for a car/session |
+
+## 🏁 Race Story Endpoints
+
+### 1️⃣ Manual Story Generation
+
+Generate a race story by explicitly providing race events and summary statistics in the request body.
+
+- **Endpoint:** `POST /api/race/story`
+
+
+### 2️⃣ Auto Story Generation (Session-Based)
+
+Generate a race story automatically from stored session data with minimal input.
+
+- **Endpoint:** `POST /api/race/story/auto`
+- **Request Body:**
+
+```json
+{
+  "session_id": "race_xxx",
+  "vehicle_id": 1
+}
+```
+
+This endpoint:
+
+- Collects stored telemetry for the session
+- Extracts statistics
+- Generates the narrative
+- Returns the final race story
+
+
+### 3️⃣ Auto Story Generation 
+
+`POST /generate-race-story-auto`
+Automatically generates a detailed narrative/story for a specific car in a race session.
+This endpoint does not require race events or summary stats in the request body; it fetches all necessary race data internally, processes it, and creates a post‑race analysis story.
+
+- **Endpoint:** `POST /generate-race-story-auto`
+- **Request Body:**
+
+```json
+{
+  "session_id": "race_8732362887cc",
+  "vehicle_id": 1
+}
+```
+
+- **Response Example:**
+
+```json
+{
+  "session_id": "race_8732362887cc",
+  "vehicle_id": 1,
+  "story": "Car #1 experienced a perplexing race..."
+}
+```
+
+- **Use Case:**
+Use this endpoint when the frontend needs to display a final race story for a given car and session without manually aggregating or passing race events and stats.
+
+
+## 🧩 Example Prediction Request
+
+```json
+{
+  "session_id": "race_12345",
+  "vehicle_id": 1,
+  "lap": 25,
+  "max_speed": 340.5,
+  "avg_speed": 280.0,
+  "std_speed": 45.2,
+  "avg_throttle": 0.75,
+  "brake_front_freq": 12,
+  "brake_rear_freq": 8,
+  "dominant_gear": 6,
+  "avg_steer_angle": 5.5,
+  "avg_long_accel": 2.1,
+  "avg_lat_accel": 3.2,
+  "avg_rpm": 11000,
+  "rolling_std_lap_time": 0.5,
+  "lap_time_delta": 0.3,
+  "tire_wear_high": 0.45,
+  "air_temp": 25.0,
+  "track_temp": 45.0,
+  "humidity": 60.0,
+  "pressure": 1013.25,
+  "wind_speed": 5.0,
+  "wind_direction": 90,
+  "rain": 0
+}
+```
+
+
+## 🧹 Troubleshooting
+
+- **Prediction returns 404**
+    - Create a session first:
+        - `POST /api/session/create?vehicle_id=1`
+- **"models not found"**
+    - Run model training:
+        - `python train.py`
+- **Missing dependencies**
+    - Install requirements:
+        - `pip install -r requirements.txt`
+- **Port already in use**
+    - Start on another port:
+        - `uvicorn app.main:app --port 8001`
+- **Training reports “no data”**
+    - Prepare data:
+        - `python prepare_data.py`
+
+
+## 🧑‍💻 Development \& Contribution
+
+Run tests:
+
+```bash
+pytest -v
+```
+
+Format code:
+
+```bash
 black app/
-flake8 app/
+```
+
+Type checking:
+
+```bash
 mypy app/
 ```
 
-### Frontend
 
-```powershell
-cd frontend
-npm run lint
-```
+## 📘 Additional Notes
 
-You can add your own E2E/UI tests (e.g. Cypress or Playwright) on top of this.
+- All session data is stored in memory
+- Models are loaded from `data/models/`
+- The API is stateless except for in-memory session tracking
+- Race story endpoints can auto-generate narratives from stored session performance
+- `example_client.py` serves as a reference for integration
+- Full OpenAPI schema:
+    - http://localhost:8000/openapi.json
+
+
+## 🎉 You’re Ready with LapLens
+
+LapLens backend provides:
+
+- Session tracking
+- Lap time prediction
+- Pit stop prediction
+- Tire compound classification
+- Auto-generated race stories
+- Clean, modular API architecture
+- End‑to‑end pipeline from data → model → API
+
+
+## 🏎️ LapLens Frontend Documentation
+
+LapLens is a real-time race strategy platform that transforms **Toyota GR Cup telemetry data** into actionable insights using machine learning predictions. The frontend provides an intuitive dashboard for monitoring live racing data, AI‑powered predictions, and strategic decision‑making.
 
 ---
 
-## 6. Docker & Deployment (Backend)
+## 🚀 Tech Stack
 
-The backend includes `Dockerfile` and `docker-compose.yml` in backend.
+* **Framework:** Next.js 14 (App Router)
+* **Language:** TypeScript
+* **Styling:** Tailwind CSS
+* **UI:** Custom components + Framer Motion animations
+* **State Management:** React Hooks (useState, useEffect, custom hooks)
+* **Data Fetching:** Native Fetch API with custom hooks
+* **Charts:** Recharts for visualizations
 
-From backend:
+---
 
-```powershell
-cd backend
-docker-compose up
-```
+## 📦 Installation & Setup
 
-This will build and run the FastAPI service in a container, exposing port `8000`.
+### **Prerequisites**
 
-For a more production-like setup, see the “Production Deployment” section in README.md (Gunicorn + Uvicorn workers, environment variables, etc.).
+* Node.js **18.17+**
+* npm / yarn
+* Backend API server running
 
-### Frontend Production Build
+### **Installation Steps**
 
-From frontend:
+#### 1. Clone the repository
 
-```powershell
+```bash
+git clone <repository-url>
 cd frontend
-npm run build
-npm run start
 ```
 
-Deploy on Vercel, Azure Static Web Apps, or any Node-capable platform, configuring:
+#### 2. Install dependencies
+
+```bash
+npm install
+# or
+yarn install
+```
+
+### 3. Environment Configuration
+
+Create a `.env.local` in the root directory:
 
 ```env
-NEXT_PUBLIC_API_BASE=https://your-backend-url
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+```
+
+### 4. Run the development server
+
+```bash
+npm run dev
+
+
+### 5. Open in browser
+
+Go to: **[http://localhost:3000](http://localhost:3000)**
+
+---
+
+## 🔧 Available Scripts
+
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run start    # Start production server
+npm run lint     # Run ESLint
 ```
 
 ---
 
-## 7. Useful Reference Files
+## 🏗️ Project Structure
 
-- **Backend**
-  - README.md – Full API and project documentation.
-  - GETTING_STARTED.md – Step-by-step setup & quick start.
-  - START_HERE.md – High-level implementation summary and status.
-  - API_TESTING_GUIDE.md – cURL and request examples.
-  - IMPLEMENTATION_SUMMARY.md – Architecture and design notes.
-- **Frontend**
-  - README.md – Routes, features, and env configuration.
+```
+src/
+├── app/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── analysis/
+├── components/
+│   ├── layout/
+│   ├── dashboard/
+│   └── ui/
+├── hooks/
+├── lib/
+└── types/
+```
 
+---
+
+## 📄 Page Descriptions
+
+### 🏠 **Landing Page** (`/`)
+
+* Entry point to the app
+* Toyota Gazoo Racing themed design
+* Intro + navigation to session/vehicle selection
+
+### 🚗 **Vehicle Selection**
+
+* Select vehicle for analysis
+* Manage/create sessions
+* Vehicle‑specific setup
+
+### 🎮 **Control Panel**
+
+* Switch between analysis views
+* Live status indicators
+* Session + vehicle info
+
+### 📊 **Overview Page**
+
+* Central monitoring dashboard
+* Live lap time predictions
+* Pit stop analysis
+* Tire strategy indicators
+* AI confidence visualizations
+
+### 🔢 **Prediction Metrics**
+
+* Lap time predictions
+* Pit stop recommendations
+* Tire compound strategy
+* Real‑time confidence metrics
+
+### 📈 **Live Telemetry Page**
+
+* Speed, throttle, brake, tire metrics
+* Interactive charts
+* Environmental telemetry
+
+### 🤖 **AI Predictions Page**
+
+* Extended model explanations
+* Detailed forecast reasoning
+* Strategy recommendations
+
+### 🗺️ **Track Map Page**
+
+* Circuit visualization
+* Sector breakdowns
+* Future: live car tracking
+
+### 📋 **Analytics Page**
+
+* Session statistics
+* Trend analysis
+* System status
+* Export capabilities
+
+### 📖 **Story Generator**
+
+* AI‑generated race narration
+* Session summary
+* Professional race debriefs
+* Shareable reports
+
+---
+
+## 🎯 Key Features
+
+### **Real-time Data Processing**
+
+* Telemetry streaming
+* Automatic prediction refresh
+* Connection monitoring
+
+### **AI-Powered Insights**
+
+* ML-based predictions
+* Natural language reasoning
+* Confidence‑based recommendations
+
+### **Professional Racing UI**
+
+* Toyota Gazoo Racing theme
+* Framer Motion animations
+* Responsive across all devices
+
+### **Session Management**
+
+* Multiple vehicles
+* Session persistence
+* Export & analysis
+
+---
+
+## 🔧 Custom Hooks
+
+### `useLiveRaceData`
+
+* Fetches + normalizes real-time telemetry
+* Connection state handling
+* Configurable polling
+
+### `usePredictions`
+
+* Manages AI predictions
+* Local storage support
+* Handles errors + fallback logic
+
+### `useSession`
+
+* Session lifecycle manager
+* Wraps API communication
+* Persistent state
+
+---
+
+## 🔄 Data Flow
+
+1. Telemetry input from backend
+2. ML model predictions
+3. Frontend visualization
+4. User strategy interaction
+5. Narrative/story generation
+
+---
+
+## 🚦 Performance Optimizations
+
+* Memoized components
+* Split code with dynamic imports
+* Cached responses
+* Optimized image delivery
+
+---
 

@@ -1,4 +1,4 @@
-# F1 Telemetry Prediction Backend - Complete Checklist ✅
+# Telemetry Prediction Backend - Complete Checklist ✅
 
 ## Project Status: COMPLETE ✅
 

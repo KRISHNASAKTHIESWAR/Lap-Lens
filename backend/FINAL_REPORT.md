@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-A **complete, production-ready FastAPI backend** for F1 Telemetry prediction has been successfully implemented with all required components.
+A **complete, production-ready FastAPI backend** for Telemetry prediction has been successfully implemented with all required components.
 
 ---
 

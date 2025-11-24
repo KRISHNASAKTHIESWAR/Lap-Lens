@@ -1,4 +1,4 @@
-# 📚 F1 Telemetry Backend - Documentation Index
+# 📚 Telemetry Backend - Documentation Index
 
 **Start here to navigate all project documentation.**
 

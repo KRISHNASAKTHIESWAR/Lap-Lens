@@ -1,8 +1,8 @@
-# 🏁 F1 Telemetry Prediction Backend - Implementation Complete! 🏁
+# 🏁 Telemetry Prediction Backend - Implementation Complete! 🏁
 
 ## 📊 Project Summary
 
-A **complete, production-ready FastAPI backend** for F1 telemetry analysis has been built with:
+A **complete, production-ready FastAPI backend** for telemetry analysis has been built with:
 
 - ✅ **10 API Endpoints** (Session management + Predictions)
 - ✅ **3 ML Models** (Lap Time, Pit Detection, Tire Suggestion)

@@ -1,6 +1,6 @@
-# F1 Telemetry Prediction API
+# Telemetry Prediction API
 
-A production-ready FastAPI backend for predicting F1 race telemetry metrics including lap times, pit stop timing, and tire compound suggestions.
+A production-ready FastAPI backend for predicting race telemetry metrics including lap times, pit stop timing, and tire compound suggestions.
 
 ## Features
 

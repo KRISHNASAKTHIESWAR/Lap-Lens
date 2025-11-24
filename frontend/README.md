@@ -1,6 +1,6 @@
 # LapLens Frontend
 
-Next.js 14 (App Router) TypeScript UI for the LapLens F1 telemetry and race-strategy system. It consumes the FastAPI backend to display session state, predictions, and analysis views for engineers.
+Next.js 14 (App Router) TypeScript UI for the LapLens telemetry and race-strategy system. It consumes the FastAPI backend to display session state, predictions, and analysis views for engineers.
 
 ---
 

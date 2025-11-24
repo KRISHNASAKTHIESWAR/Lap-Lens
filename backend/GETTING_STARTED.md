@@ -1,4 +1,4 @@
-# Getting Started with F1 Telemetry Prediction API
+# Getting Started with Telemetry Prediction API
 
 ## Quick Start (5 minutes)
 
