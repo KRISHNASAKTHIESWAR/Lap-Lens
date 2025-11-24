@@ -326,8 +326,8 @@ def train_models_cli():
     print("MODEL TRAINING COMPLETED")
     print("="*50)
     print(f"Lap Time Model - R²: {metrics['lap_time']['r2']:.4f}")
-    print(f"Pit Imminent Model - Accuracy: {metrics['pit_imminent']['accuracy']:.4f}")
-    print(f"Tire Compound Model - Accuracy: {metrics['tire_compound']['accuracy']:.4f}")
+    # print(f"Pit Imminent Model - Accuracy: {metrics['pit_imminent']['accuracy']:.4f}")
+    # print(f"Tire Compound Model - Accuracy: {metrics['tire_compound']['accuracy']:.4f}")
     print("="*50 + "\n")
 
 
