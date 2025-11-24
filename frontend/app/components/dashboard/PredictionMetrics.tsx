@@ -1,12 +1,19 @@
 'use client';
 
 import { AllPredictionsResponse } from '../../lib/types';
+import { usePredictions } from '../../hooks/usePredictions'; // Adjust path as needed
 
 interface PredictionMetricsProps {
   predictions: AllPredictionsResponse;
+  sessionId: string;
 }
 
-export default function PredictionMetrics({ predictions }: PredictionMetricsProps) {
+export default function PredictionMetrics({ predictions, sessionId }: PredictionMetricsProps) {
+  const { getCurrentCompound } = usePredictions();
+  
+  // Get the stored compound instead of using the changing prediction value
+  const currentCompound = getCurrentCompound(sessionId) || predictions.tire_compound;
+
   const formatLapTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = (seconds % 60).toFixed(3);
@@ -90,7 +97,7 @@ export default function PredictionMetrics({ predictions }: PredictionMetricsProp
 
         <div className="text-center">
           <div className="text-3xl font-orbitron font-bold text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.25)] mb-3">
-            {predictions.tire_compound}
+            {currentCompound} 
           </div>
 
           <div className="flex items-center justify-center space-x-3">

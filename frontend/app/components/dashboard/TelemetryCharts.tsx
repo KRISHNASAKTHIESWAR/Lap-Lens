@@ -6,28 +6,42 @@ import { AllPredictionsResponse } from '../../lib/types';
 interface TelemetryChartsProps {
   vehicleId: number;
   predictions: AllPredictionsResponse;
+  liveData?: any; // Add this
+  isSessionActive?: boolean; // Add this
 }
 
-export default function TelemetryCharts({ vehicleId, predictions }: TelemetryChartsProps) {
+export default function TelemetryCharts({ vehicleId, predictions, liveData, isSessionActive = true }: TelemetryChartsProps) {
   const [telemetryData, setTelemetryData] = useState<any[]>([]);
 
+  // Fast updates for telemetry (300ms) - only when session is active
   useEffect(() => {
+    if (!isSessionActive) return;
+
     const interval = setInterval(() => {
       setTelemetryData(prev => {
+        const currentLiveData = liveData || {};
         const newData = {
           timestamp: Date.now(),
-          speed: 200 + Math.random() * 100,
-          rpm: 8000 + Math.random() * 4000,
-          throttle: Math.random() * 100,
-          brake: Math.random() * 100,
-          gear: Math.floor(Math.random() * 8) + 1
+          speed: currentLiveData.max_speed || (200 + Math.random() * 100),
+          rpm: currentLiveData.avg_rpm || (8000 + Math.random() * 4000),
+          throttle: currentLiveData.avg_throttle || (Math.random() * 100),
+          brake: ((currentLiveData.brake_front_freq || 0) + (currentLiveData.brake_rear_freq || 0)) * 20,
+          gear: currentLiveData.dominant_gear || (Math.floor(Math.random() * 8) + 1)
         };
         return [...prev.slice(-19), newData];
       });
-    }, 500);
+    }, 300);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [liveData, isSessionActive]);
+
+  const currentData = telemetryData[telemetryData.length - 1] || {
+    speed: 0,
+    rpm: 0,
+    throttle: 0,
+    brake: 0,
+    gear: 1
+  };
 
   return (
     <div className="
@@ -43,8 +57,10 @@ export default function TelemetryCharts({ vehicleId, predictions }: TelemetryCha
           LIVE TELEMETRY
         </h2>
         <div className="flex items-center space-x-2">
-          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-          <span className="text-sm text-red-400">STREAMING</span>
+          <div className={`w-2 h-2 rounded-full ${isSessionActive ? 'bg-red-500 animate-pulse' : 'bg-gray-500'}`}></div>
+          <span className={`text-sm ${isSessionActive ? 'text-red-400' : 'text-gray-400'}`}>
+            {isSessionActive ? 'STREAMING • 300ms' : 'FROZEN'}
+          </span>
         </div>
       </div>
 
@@ -64,11 +80,11 @@ export default function TelemetryCharts({ vehicleId, predictions }: TelemetryCha
           </h3>
           <div className="relative h-32 flex items-center justify-center">
             <div className="text-5xl font-bold font-orbitron text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
-              {telemetryData[telemetryData.length - 1]?.speed.toFixed(0) || '0'}
+              {currentData.speed.toFixed(0)}
               <span className="text-xl text-gray-500 ml-2">KM/H</span>
             </div>
             <div className="absolute bottom-4 right-4 text-sm text-gray-400">
-              GEAR {telemetryData[telemetryData.length - 1]?.gear || '1'}
+              GEAR {currentData.gear}
             </div>
           </div>
         </div>
@@ -86,7 +102,7 @@ export default function TelemetryCharts({ vehicleId, predictions }: TelemetryCha
           </h3>
           <div className="relative h-32 flex items-center justify-center">
             <div className="text-5xl font-bold font-orbitron text-red-400 drop-shadow-[0_0_10px_rgba(255,0,0,0.4)]">
-              {telemetryData[telemetryData.length - 1]?.rpm.toFixed(0) || '0'}
+              {currentData.rpm.toFixed(0)}
             </div>
             <div className="absolute bottom-4 right-4">
               <div
@@ -125,7 +141,7 @@ export default function TelemetryCharts({ vehicleId, predictions }: TelemetryCha
             <div>
               <div className="flex justify-between text-sm text-gray-400 mb-2">
                 <span>THROTTLE</span>
-                <span>{telemetryData[telemetryData.length - 1]?.throttle.toFixed(0) || '0'}%</span>
+                <span>{currentData.throttle.toFixed(0)}%</span>
               </div>
               <div className="w-full bg-gray-800 rounded-full h-3">
                 <div
@@ -136,7 +152,7 @@ export default function TelemetryCharts({ vehicleId, predictions }: TelemetryCha
                     transition-all duration-300 
                     shadow-[0_0_10px_rgba(255,0,0,0.4)]
                   "
-                  style={{ width: `${telemetryData[telemetryData.length - 1]?.throttle || 0}%` }}
+                  style={{ width: `${currentData.throttle}%` }}
                 ></div>
               </div>
             </div>
@@ -145,7 +161,7 @@ export default function TelemetryCharts({ vehicleId, predictions }: TelemetryCha
             <div>
               <div className="flex justify-between text-sm text-gray-400 mb-2">
                 <span>BRAKE</span>
-                <span>{telemetryData[telemetryData.length - 1]?.brake.toFixed(0) || '0'}%</span>
+                <span>{currentData.brake.toFixed(0)}%</span>
               </div>
               <div className="w-full bg-gray-800 rounded-full h-3">
                 <div
@@ -156,7 +172,7 @@ export default function TelemetryCharts({ vehicleId, predictions }: TelemetryCha
                     transition-all duration-300 
                     shadow-[0_0_10px_rgba(255,0,0,0.4)]
                   "
-                  style={{ width: `${telemetryData[telemetryData.length - 1]?.brake || 0}%` }}
+                  style={{ width: `${currentData.brake}%` }}
                 ></div>
               </div>
             </div>
@@ -202,6 +218,28 @@ export default function TelemetryCharts({ vehicleId, predictions }: TelemetryCha
         </div>
 
       </div>
+
+      {/* Additional Live Data */}
+      {liveData && (
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+          <div className="bg-black/30 rounded-lg p-3 border border-red-800/20">
+            <div className="text-xs text-gray-400">STEER ANGLE</div>
+            <div className="text-lg font-orbitron text-white">{liveData.avg_steer_angle?.toFixed(1) || '0.0'}°</div>
+          </div>
+          <div className="bg-black/30 rounded-lg p-3 border border-red-800/20">
+            <div className="text-xs text-gray-400">LAT G-FORCE</div>
+            <div className="text-lg font-orbitron text-white">{liveData.avg_lat_accel?.toFixed(1) || '0.0'}G</div>
+          </div>
+          <div className="bg-black/30 rounded-lg p-3 border border-red-800/20">
+            <div className="text-xs text-gray-400">LONG G-FORCE</div>
+            <div className="text-lg font-orbitron text-white">{liveData.avg_long_accel?.toFixed(1) || '0.0'}G</div>
+          </div>
+          <div className="bg-black/30 rounded-lg p-3 border border-red-800/20">
+            <div className="text-xs text-gray-400">TIRE WEAR</div>
+            <div className="text-lg font-orbitron text-red-400">{liveData.tire_wear_high?.toFixed(1) || '0.0'}%</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

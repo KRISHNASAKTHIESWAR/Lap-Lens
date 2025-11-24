@@ -11,6 +11,9 @@ import SessionInfo from '../components/dashboard/SessionInfo';
 import LiveMetrics from '../components/dashboard/LiveMetrics';
 import TrackMap from '../components/dashboard/TrackMap';
 import StoryGenerator from '../components/dashboard/StoryGenerator';
+import { useLiveRaceData } from '../hooks/useLiveRaceData';
+import { usePredictions } from '../hooks/usePredictions';
+import { PredictionRequest } from '../lib/types';
 
 export interface AllPredictionsResponse {
   session_id: string;
@@ -22,7 +25,12 @@ export interface AllPredictionsResponse {
   pit_probability: number;
   tire_compound: string;
   tire_confidence: number;
-   lap_time_explanation?: string;
+  explanations?: {
+    lap_time?: string;
+    pit?: string;  
+    tire?: string;
+  };
+  lap_time_explanation?: string;
   pit_explanation?: string;
   tire_explanation?: string;
 }
@@ -39,18 +47,165 @@ export default function AnalysisPage() {
   const sessionId = searchParams.get('session_id');
   const vehicleId = searchParams.get('vehicle_id');
 
-  const [predictions, setPredictions] = useState<AllPredictionsResponse| null>(null);
+  const [predictions, setPredictions] = useState<AllPredictionsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('overview');
   const [showStoryGenerator, setShowStoryGenerator] = useState(false);
+  const [currentLap, setCurrentLap] = useState(1);
+  const [finalLap, setFinalLap] = useState(1);
+  const [isSessionActive, setIsSessionActive] = useState(true);
+  const [lastExplanationUpdate, setLastExplanationUpdate] = useState(0);
 
+  // Use live data hook - stops completely when session is not active
+  const liveData = useLiveRaceData({}, 3000, isSessionActive);
+  
+  // Use predictions hook for consistent tire compound storage
+  const { getAllPredictions, getCurrentCompound } = usePredictions();
+
+  // Track lap progression - ONLY when session is active
+  useEffect(() => {
+    if (isSessionActive && liveData.lap > currentLap) {
+      setCurrentLap(liveData.lap);
+    }
+  }, [liveData.lap, currentLap, isSessionActive]);
+
+  // Initial data fetch from backend
   useEffect(() => {
     if (sessionId && vehicleId) {
       fetchPredictions();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, vehicleId]);
+
+  // Update predictions with live data AND fetch new AI explanations every 10 seconds
+  useEffect(() => {
+    if (predictions && isSessionActive) {
+      const now = Date.now();
+      
+      // Get the stored compound to maintain consistency
+      const storedCompound = getCurrentCompound(sessionId!);
+      
+      // Update numeric values immediately
+      setPredictions(prev => prev ? {
+        ...prev,
+        lap: liveData.lap,
+        lap_time: liveData.lap_time,
+        lap_time_confidence: liveData.lap_time_confidence,
+        pit_imminent: liveData.pit_imminent,
+        pit_probability: liveData.pit_probability,
+        tire_compound: storedCompound || liveData.tire_compound, // Use stored compound
+        tire_confidence: liveData.tire_confidence,
+      } : null);
+
+      // Fetch new AI explanations every 10 seconds with current data
+      if (now - lastExplanationUpdate > 10000) { // 10 seconds
+        fetchAIExplanations();
+        setLastExplanationUpdate(now);
+      }
+    }
+  }, [liveData, isSessionActive, sessionId, getCurrentCompound]);
+
+  // STOP ALL UPDATES when session closes
+  const handleSessionClose = async () => {
+    setIsSessionActive(false); // This stops useLiveRaceData hook
+    setFinalLap(currentLap); // Capture the final lap
+    
+    try {
+      // Actually close the session in backend
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/session/${sessionId}/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      console.log(`Session closed at lap ${currentLap}`);
+    } catch (err) {
+      console.error('Error closing session in backend:', err);
+    }
+    
+    setShowStoryGenerator(true);
+  };
+
+  // Fetch AI explanations with current live data every 10 seconds
+  const fetchAIExplanations = async () => {
+    if (!sessionId || !vehicleId || !isSessionActive) return;
+
+    try {
+      const vehicleNum = parseInt(vehicleId);
+      
+      // Prepare current live data for backend
+      const currentData: PredictionRequest = {
+        session_id: sessionId,
+        vehicle_id: vehicleNum,
+        lap: liveData.lap,
+        max_speed: liveData.max_speed,
+        avg_speed: liveData.avg_speed,
+        std_speed: liveData.std_speed,
+        avg_throttle: liveData.avg_throttle,
+        brake_front_freq: liveData.brake_front_freq,
+        brake_rear_freq: liveData.brake_rear_freq,
+        dominant_gear: liveData.dominant_gear,
+        avg_steer_angle: liveData.avg_steer_angle,
+        avg_long_accel: liveData.avg_long_accel,
+        avg_lat_accel: liveData.avg_lat_accel,
+        avg_rpm: liveData.avg_rpm,
+        rolling_std_lap_time: liveData.rolling_std_lap_time,
+        lap_time_delta: liveData.lap_time_delta,
+        tire_wear_high: liveData.tire_wear_high,
+        air_temp: liveData.air_temp,
+        track_temp: liveData.track_temp,
+        humidity: liveData.humidity,
+        pressure: liveData.pressure,
+        wind_speed: liveData.wind_speed,
+        wind_direction: liveData.wind_direction,
+        rain: liveData.rain
+      };
+
+      // Call all three prediction endpoints with current data
+      const [lapTimeRes, pitRes, tireRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/predict/lap-time`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentData)
+        }),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/predict/pit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentData)
+        }),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/predict/tire`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentData)
+        })
+      ]);
+
+      if (lapTimeRes.ok && pitRes.ok && tireRes.ok) {
+        const [lapTimeData, pitData, tireData] = await Promise.all([
+          lapTimeRes.json(),
+          pitRes.json(),
+          tireRes.json()
+        ]);
+
+        // Update predictions with new AI explanations
+        setPredictions(prev => prev ? {
+          ...prev,
+          lap_time_explanation: lapTimeData.explanation,
+          pit_explanation: pitData.explanation,
+          tire_explanation: tireData.explanation,
+          explanations: {
+            lap_time: lapTimeData.explanation,
+            pit: pitData.explanation,
+            tire: tireData.explanation
+          }
+        } : null);
+        
+        console.log('AI explanations updated at lap:', liveData.lap);
+      }
+    } catch (err) {
+      console.error('Error fetching AI explanations:', err);
+    }
+  };
 
   const fetchPredictions = async () => {
     setIsLoading(true);
@@ -59,92 +214,90 @@ export default function AnalysisPage() {
     try {
       const vehicleNum = parseInt(vehicleId!);
 
-      const baseData = {
+      const predictionData: PredictionRequest = {
         session_id: sessionId!,
         vehicle_id: vehicleNum,
-        lap: Math.floor(Math.random() * 50) + 1,
-        max_speed: 280 + (Math.random() * 40),
-        avg_speed: 180 + (Math.random() * 60),
-        std_speed: 5 + (Math.random() * 10),
-        avg_throttle: 60 + (Math.random() * 35),
-        brake_front_freq: 0.5 + (Math.random() * 2),
-        brake_rear_freq: 0.5 + (Math.random() * 2),
-        dominant_gear: Math.floor(Math.random() * 8) + 1,
-        avg_steer_angle: 2 + (Math.random() * 8),
-        avg_long_accel: 0.5 + (Math.random() * 2),
-        avg_lat_accel: 1 + (Math.random() * 3),
-        avg_rpm: 8000 + (Math.random() * 3000),
-        rolling_std_lap_time: 0.5 + (Math.random() * 2),
-        lap_time_delta: -2 + (Math.random() * 4),
-        tire_wear_high: 10 + (Math.random() * 40),
-        air_temp: 20 + (Math.random() * 15),
-        track_temp: 25 + (Math.random() * 20),
-        humidity: 30 + (Math.random() * 50),
-        pressure: 1000 + (Math.random() * 20),
-        wind_speed: 1 + (Math.random() * 10),
-        wind_direction: Math.random() * 360,
-        rain: Math.random() > 0.8 ? 1 : 0
+        lap: currentLap,
+        max_speed: liveData.max_speed,
+        avg_speed: liveData.avg_speed,
+        std_speed: liveData.std_speed,
+        avg_throttle: liveData.avg_throttle,
+        brake_front_freq: liveData.brake_front_freq,
+        brake_rear_freq: liveData.brake_rear_freq,
+        dominant_gear: liveData.dominant_gear,
+        avg_steer_angle: liveData.avg_steer_angle,
+        avg_long_accel: liveData.avg_long_accel,
+        avg_lat_accel: liveData.avg_lat_accel,
+        avg_rpm: liveData.avg_rpm,
+        rolling_std_lap_time: liveData.rolling_std_lap_time,
+        lap_time_delta: liveData.lap_time_delta,
+        tire_wear_high: liveData.tire_wear_high,
+        air_temp: liveData.air_temp,
+        track_temp: liveData.track_temp,
+        humidity: liveData.humidity,
+        pressure: liveData.pressure,
+        wind_speed: liveData.wind_speed,
+        wind_direction: liveData.wind_direction,
+        rain: liveData.rain
       };
 
-      const [lapTimeRes, pitRes, tireRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/predict/lap-time`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(baseData)
-        }),
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/predict/pit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(baseData)
-        }),
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/predict/tire`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(baseData)
-        })
-      ]);
-
-      const [lapTimeData, pitData, tireData] = await Promise.all([
-        lapTimeRes.json(),
-        pitRes.json(),
-        tireRes.json()
-      ]);
+      // Use the predictions hook which handles compound storage
+      const result = await getAllPredictions(predictionData);
+      
+      // Get the stored compound to ensure consistency
+      const storedCompound = getCurrentCompound(sessionId!);
 
       const allPredictions: AllPredictionsResponse = {
         session_id: sessionId!,
         vehicle_id: vehicleNum,
-        lap: baseData.lap,
-        lap_time: safeNumber(lapTimeData.predicted_lap_time, 85.0),
-        lap_time_confidence: safeNumber(lapTimeData.confidence, 0.85),
-        pit_imminent: pitData.pit_imminent || false,
-        pit_probability: safeNumber(pitData.probability, 0.5),
-        tire_compound: tireData.suggested_compound || 'MEDIUM',
-        tire_confidence: safeNumber(tireData.confidence, 0.75),
-        lap_time_explanation: lapTimeData.explanation,
-        pit_explanation: pitData.explanation,
-        tire_explanation: tireData.explanation
+        lap: currentLap,
+        lap_time: safeNumber(result.lap_time, liveData.lap_time),
+        lap_time_confidence: safeNumber(result.lap_time_confidence, liveData.lap_time_confidence),
+        pit_imminent: result.pit_imminent || liveData.pit_imminent,
+        pit_probability: safeNumber(result.pit_probability, liveData.pit_probability),
+        tire_compound: storedCompound || result.tire_compound, // Use stored compound
+        tire_confidence: safeNumber(result.tire_confidence, liveData.tire_confidence),
+        lap_time_explanation: result.lap_time_explanation,
+        pit_explanation: result.pit_explanation,
+        tire_explanation: result.tire_explanation,
+        explanations: {
+          lap_time: result.lap_time_explanation,
+          pit: result.pit_explanation,
+          tire: result.tire_explanation
+        }
       };
 
       setPredictions(allPredictions);
+      setLastExplanationUpdate(Date.now());
 
     } catch (err) {
       console.error('Error:', err);
-      setError('Using demo data - Backend connection failed');
-      setPredictions({
+      setError('Using live data - Backend connection failed');
+      
+      // Use live data with fallback explanations
+      const storedCompound = getCurrentCompound(sessionId!);
+      
+      const fallbackPredictions: AllPredictionsResponse = {
         session_id: sessionId!,
         vehicle_id: parseInt(vehicleId!),
-        lap: 12,
-        lap_time: 85.234,
-        lap_time_confidence: 0.87,
-        pit_imminent: false,
-        pit_probability: 0.23,
-        tire_compound: 'SOFT',
-        tire_confidence: 0.91,
-        lap_time_explanation: "Demo: AI analysis of lap time prediction based on simulated telemetry data.",
-        pit_explanation: "Demo: AI analysis of pit stop probability based on simulated tire wear and performance metrics.",
-        tire_explanation: "Demo: AI analysis of optimal tire compound based on simulated track conditions."
-
-      });
+        lap: liveData.lap,
+        lap_time: liveData.lap_time,
+        lap_time_confidence: liveData.lap_time_confidence,
+        pit_imminent: liveData.pit_imminent,
+        pit_probability: liveData.pit_probability,
+        tire_compound: storedCompound || liveData.tire_compound, // Use stored compound
+        tire_confidence: liveData.tire_confidence,
+        lap_time_explanation: `Live Analysis (Lap ${liveData.lap}): Predicted lap time of ${liveData.lap_time.toFixed(3)}s based on current telemetry.`,
+        pit_explanation: `Live Analysis (Lap ${liveData.lap}): ${liveData.pit_imminent ? 'Pit stop recommended' : 'Continue current stint'}.`,
+        tire_explanation: `Live Analysis (Lap ${liveData.lap}): ${storedCompound || liveData.tire_compound} compound recommended for current conditions.`,
+        explanations: {
+          lap_time: `Live Analysis (Lap ${liveData.lap}): Predicted lap time of ${liveData.lap_time.toFixed(3)}s based on current telemetry.`,
+          pit: `Live Analysis (Lap ${liveData.lap}): ${liveData.pit_imminent ? 'Pit stop recommended' : 'Continue current stint'}.`,
+          tire: `Live Analysis (Lap ${liveData.lap}): ${storedCompound || liveData.tire_compound} compound recommended for current conditions.`
+        }
+      };
+      
+      setPredictions(fallbackPredictions);
     } finally {
       setIsLoading(false);
     }
@@ -190,8 +343,32 @@ export default function AnalysisPage() {
           vehicleId={parseInt(vehicleId!)}
         />
 
+        {/* Live Status Indicator */}
+        {!isLoading && isSessionActive && (
+          <div className="flex items-center justify-end mb-2">
+            <div className="flex items-center space-x-2 bg-black/50 px-3 py-1 rounded-full border border-green-500/30">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-green-400 font-orbitron">
+                LIVE DATA • LAP {currentLap} • AI UPDATING EVERY 10s
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Session Closed Indicator */}
+        {!isSessionActive && (
+          <div className="flex items-center justify-end mb-2">
+            <div className="flex items-center space-x-2 bg-black/50 px-3 py-1 rounded-full border border-red-500/30">
+              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              <span className="text-xs text-red-400 font-orbitron">
+                SESSION CLOSED • FINAL LAP {finalLap}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Main Content Area */}
-        <div className="mt-6 min-h-[600px]">
+        <div className="mt-4 min-h-[600px]">
           {/* Loading state */}
           {isLoading && (
             <div className="min-h-[420px] flex flex-col items-center justify-center">
@@ -213,18 +390,25 @@ export default function AnalysisPage() {
           )}
 
           {/* Loaded views */}
-          {!isLoading && (
+          {!isLoading && predictions && (
             <>
               {/* Overview View */}
-              {activeView === 'overview' && predictions && (
-                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+              {activeView === 'overview' && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 12 }} 
+                  animate={{ opacity: 1, y: 0 }}
+                  className="grid grid-cols-1 xl:grid-cols-4 gap-6"
+                >
                   
                   {/* Left Column - Main Content */}
                   <div className="xl:col-span-3 space-y-6">
                     {/* Prediction Metrics - Top Card */}
                     <div className="rounded-2xl p-1 bg-gradient-to-r from-white/5 via-red-700/40 to-white/5 shadow-lg">
                       <div className="bg-black/60 rounded-2xl p-6">
-                        <PredictionMetrics predictions={predictions} />
+                        <PredictionMetrics 
+                          predictions={predictions} 
+                          sessionId={sessionId}  
+                        />
                       </div>
                     </div>
 
@@ -242,15 +426,19 @@ export default function AnalysisPage() {
                       <div className="rounded-xl bg-black/50 p-5 border border-white/5">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h3 className="text-sm text-gray-300 font-orbitron tracking-wider">LIVE STATUS</h3>
+                            <h3 className="text-sm text-gray-300 font-orbitron tracking-wider">
+                              {isSessionActive ? 'LIVE STATUS' : 'SESSION STATUS'}
+                            </h3>
                             <div className="flex items-center space-x-3 mt-2">
-                              <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                              <span className="text-sm text-gray-300">Telemetry Active</span>
+                              <span className={`w-3 h-3 rounded-full ${isSessionActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                              <span className="text-sm text-gray-300">
+                                {isSessionActive ? `Lap ${currentLap} • AI Updates Every 10s` : `Final Lap ${finalLap} • Data Frozen`}
+                              </span>
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-xs text-gray-400 font-orbitron">VEHICLE</div>
-                            <div className="text-xl font-bold text-red-500">#{vehicleId}</div>
+                            <div className="text-xs text-gray-400 font-orbitron">CURRENT LAP</div>
+                            <div className="text-xl font-bold text-red-500">{predictions.lap}</div>
                           </div>
                         </div>
                       </div>
@@ -260,17 +448,19 @@ export default function AnalysisPage() {
                         <h3 className="text-sm text-gray-300 font-orbitron tracking-wider mb-4">SYSTEM STATUS</h3>
                         <div className="space-y-3">
                           <div className="flex justify-between items-center">
-                            <span className="text-gray-400 text-sm">AI Predictions</span>
-                            <span className="text-green-400 text-sm">● ONLINE</span>
+                            <span className="text-gray-400 text-sm">Data Feed</span>
+                            <span className={`text-sm ${isSessionActive ? 'text-green-400' : 'text-red-400'}`}>
+                              ● {isSessionActive ? 'LIVE' : 'FROZEN'}
+                            </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-gray-400 text-sm">Telemetry Feed</span>
+                            <span className="text-gray-400 text-sm">AI Processing</span>
                             <span className="text-green-400 text-sm">● ACTIVE</span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-400 text-sm">Session</span>
-                            <span className={showStoryGenerator ? "text-red-400 text-sm" : "text-green-400 text-sm"}>
-                              ● {showStoryGenerator ? "CLOSED" : "ACTIVE"}
+                            <span className={isSessionActive ? "text-green-400 text-sm" : "text-red-400 text-sm"}>
+                              ● {isSessionActive ? "ACTIVE" : "CLOSED"}
                             </span>
                           </div>
                         </div>
@@ -288,10 +478,10 @@ export default function AnalysisPage() {
                             vehicle_id: parseInt(vehicleId),
                             race_name: "Race 1",
                             created_at: new Date().toISOString(),
-                            status: showStoryGenerator ? 'closed' : 'active'
+                            status: isSessionActive ? 'active' : 'closed'
                           }}
                           predictions={predictions}
-                          onSessionClosed={() => setShowStoryGenerator(true)}
+                          onSessionClosed={handleSessionClose}
                         />
                       </div>
                     </div>
@@ -300,16 +490,21 @@ export default function AnalysisPage() {
               )}
 
               {/* Telemetry View */}
-              {activeView === 'telemetry' && predictions && (
+              {activeView === 'telemetry' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl p-1 bg-gradient-to-r from-white/5 via-red-700/20 to-white/5">
                   <div className="bg-black/60 rounded-2xl p-6">
-                    <TelemetryCharts vehicleId={parseInt(vehicleId)} predictions={predictions} />
+                    <TelemetryCharts 
+                      vehicleId={parseInt(vehicleId)} 
+                      predictions={predictions} 
+                      liveData={liveData}
+                      isSessionActive={isSessionActive}
+                    />
                   </div>
                 </motion.div>
               )}
 
               {/* Predictions View */}
-              {activeView === 'predictions' && predictions && (
+              {activeView === 'predictions' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl p-1 bg-gradient-to-r from-white/5 via-red-700/20 to-white/5">
                   <div className="bg-black/60 rounded-2xl p-6">
                     <LiveMetrics vehicleId={parseInt(vehicleId)} predictions={predictions} />
@@ -327,7 +522,7 @@ export default function AnalysisPage() {
               )}
 
               {/* Metrics View */}
-              {activeView === 'metrics' && predictions && (
+              {activeView === 'metrics' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="rounded-2xl p-1 bg-gradient-to-r from-white/5 via-red-700/20 to-white/5">
                     <div className="bg-black/60 rounded-2xl p-6">
@@ -337,10 +532,10 @@ export default function AnalysisPage() {
                           vehicle_id: parseInt(vehicleId),
                           race_name: "Race 1",
                           created_at: new Date().toISOString(),
-                          status: showStoryGenerator ? 'closed' : 'active'
+                          status: isSessionActive ? 'active' : 'closed'
                         }}
                         predictions={predictions}
-                        onSessionClosed={() => setShowStoryGenerator(true)}
+                        onSessionClosed={handleSessionClose}
                       />
                     </div>
                   </div>
@@ -363,7 +558,7 @@ export default function AnalysisPage() {
               <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />
               <div>
                 <div className="text-sm text-yellow-100">{error}</div>
-                <div className="text-xs text-gray-300 mt-1">Falling back to demo predictions</div>
+                <div className="text-xs text-gray-300 mt-1">Using live data with AI analysis</div>
               </div>
             </div>
           </div>
@@ -372,7 +567,7 @@ export default function AnalysisPage() {
 
       {/* Small theme badge */}
       <div className="fixed left-6 bottom-6 text-xs text-gray-300 bg-black/50 px-3 py-2 rounded-full border border-white/5 backdrop-blur-sm">
-        Toyota Theme • Gazoo Racing
+        Toyota Theme • Gazoo Racing • {isSessionActive ? 'LIVE' : 'SESSION CLOSED'}
       </div>
 
       <style jsx global>{`
@@ -387,18 +582,9 @@ export default function AnalysisPage() {
 
         @keyframes rpm {
           0% { transform: scaleY(0.35); opacity: 0.45; }
-          50% { transform: scaleY(1); opacity: 1; }
           100% { transform: scaleY(0.35); opacity: 0.45; }
         }
         .animate-rpm { animation: rpm 0.9s infinite cubic-bezier(.4,0,.2,1); }
-
-        @keyframes bar {
-          0% { height: 8px; opacity: .5; }
-          50% { height: 32px; opacity: 1; }
-          100% { height: 8px; opacity: .5; }
-        }
-
-        .animate-bar { animation: bar 1s infinite cubic-bezier(.4,0,.2,1); }
 
         .rounded-2xl { border-radius: 1rem; }
       `}</style>
